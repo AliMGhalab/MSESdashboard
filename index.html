@@ -553,7 +553,11 @@
   </div><!-- /grid -->
 </div><!-- /dashboard -->
 
-<!-- ═══════════════════ KILLSWITCH MODAL ═══════════════════ -->
+<!-- ═══════════════════ SOUND UNLOCK OVERLAY ═══════════════════ -->
+<div id="sound-unlock" class="modal-backdrop hidden" onclick="unlockAudio(); this.classList.add('hidden');">
+  <div style="background:var(--surface);border:1px solid var(--border);border-top:3px solid var(--accent);padding:32px 36px;border-radius:4px;text-align:center;max-width:320px;">
+    <div style="font-size:2rem;margin-bottom:12px;">🔊</div>
+    <div style="font-weight:700
 <div class="modal-backdrop hidden" id="kill-modal">
   <div class="modal">
     <div class="modal-title" id="modal-title">Activate Killswitch</div>
@@ -598,9 +602,14 @@
   const alarm = new Audio('alert.mp3');
   alarm.loop = true;
 
-  // Silently play+pause on first user gesture (login) to unlock audio policy
+  // Silently unlock audio policy on login click — muted so nothing is heard
   function unlockAudio() {
-    alarm.play().then(() => { alarm.pause(); alarm.currentTime = 0; }).catch(() => {});
+    alarm.volume = 0;
+    alarm.play().then(() => {
+      alarm.pause();
+      alarm.currentTime = 0;
+      alarm.volume = 1;
+    }).catch(() => { alarm.volume = 1; });
   }
 
   function startAlarm() {
