@@ -593,60 +593,25 @@
   };
 
   // ════════════════════════════════════════
-  //  INIT
+  //  ALARM — alert.mp3
   // ════════════════════════════════════════
-  // ════════════════════════════════════════
-  //  WEB AUDIO ALARM (no external file needed)
-  // ════════════════════════════════════════
-  let audioCtx = null;
-  let alarmNodes = [];   // oscillator + gain currently playing
-  let alarmPlaying = false;
+  const alarm = new Audio('alert.mp3');
+  alarm.loop = true;
 
-  function getAudioCtx() {
-    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    return audioCtx;
+  // Silently play+pause on first user gesture (login) to unlock audio policy
+  function unlockAudio() {
+    alarm.play().then(() => { alarm.pause(); alarm.currentTime = 0; }).catch(() => {});
   }
 
-  // Plays a repeating two-tone beep (like a real ward alarm)
   function startAlarm() {
-    if (alarmPlaying) return;
-    alarmPlaying = true;
-    playAlarmCycle();
-  }
-
-  function playAlarmCycle() {
-    if (!alarmPlaying) return;
-    const ctx  = getAudioCtx();
-    const gain = ctx.createGain();
-    gain.connect(ctx.destination);
-    gain.gain.setValueAtTime(0.35, ctx.currentTime);
-
-    // High tone
-    const osc1 = ctx.createOscillator();
-    osc1.type = 'square';
-    osc1.frequency.setValueAtTime(880, ctx.currentTime);
-    osc1.connect(gain);
-    osc1.start(ctx.currentTime);
-    osc1.stop(ctx.currentTime + 0.18);
-
-    // Low tone after gap
-    const osc2 = ctx.createOscillator();
-    osc2.type = 'square';
-    osc2.frequency.setValueAtTime(660, ctx.currentTime + 0.22);
-    osc2.connect(gain);
-    osc2.start(ctx.currentTime + 0.22);
-    osc2.stop(ctx.currentTime + 0.40);
-
-    alarmNodes = [osc1, osc2, gain];
-
-    // Repeat cycle every 600ms
-    setTimeout(() => { if (alarmPlaying) playAlarmCycle(); }, 600);
+    if (!alarm.paused) return;
+    alarm.currentTime = 0;
+    alarm.play().catch(() => {});
   }
 
   function stopAlarm() {
-    alarmPlaying = false;
-    alarmNodes.forEach(n => { try { n.disconnect(); } catch(e) {} });
-    alarmNodes = [];
+    alarm.pause();
+    alarm.currentTime = 0;
   }
 
   firebase.initializeApp(firebaseConfig);
@@ -666,6 +631,7 @@
     const pw = document.getElementById('pw-input').value;
     if (pw === DASHBOARD_PASSWORD) {
       sessionStorage.setItem('auth', '1');
+      unlockAudio();
       showDashboard();
     } else {
       document.getElementById('login-err').textContent = 'Incorrect password. Access denied.';
