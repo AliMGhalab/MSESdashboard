@@ -512,7 +512,7 @@
         <button class="btn btn-breach" onclick="updateDB('system1', 1)">Breach 1</button>
         <button class="btn btn-breach" onclick="updateDB('system2', 1)">Breach 2</button>
         <button class="btn btn-breach" onclick="updateDB('system3', 1)">Breach 3</button>
-        <button class="btn btn-nurse" onclick="updateDB('nurse_call', 1)">🔔 Nurse Call</button>
+        <button class="btn btn-nurse" onclick="updateDB('nurse_call', 1)">🔔 Technician Call</button>
       </div>
       <div class="card-title" style="margin-top:18px;">Activity Log</div>
       <div id="log-container"><div id="logs"></div></div>
@@ -572,7 +572,7 @@
   </div>
 </div>
 
-<audio id="alarmSound" loop><source src="alert.mp3" type="audio/mpeg"></audio>
+
 
 <script>
   // ════════════════════════════════════════
@@ -580,7 +580,7 @@
   // ════════════════════════════════════════
   const DASHBOARD_PASSWORD = "ward2024";   // change me
   const ADMIN_PIN          = "1234";       // change me
-  const VAPID_KEY          = "BPaHFR_GV_I7hHsflkpq8wBxIR7OcBPnWwC19BxRRYQVoRpfDvGYTa7-gnhrivoajsZaRUOUFHLxqI4Li11p_Hs"; // from Firebase Console > Project Settings > Cloud Messaging
+  const VAPID_KEY          = "YOUR_VAPID_KEY_HERE"; // from Firebase Console > Project Settings > Cloud Messaging
 
   const firebaseConfig = {
     apiKey:            "AIzaSyCePnTRSWFX-R0n4iIMLHIr0PZjk-WcHco",
@@ -595,11 +595,62 @@
   // ════════════════════════════════════════
   //  INIT
   // ════════════════════════════════════════
-  firebase.initializeApp(firebaseConfig);
-  const db    = firebase.database();
-  const alarm = document.getElementById('alarmSound');
+  // ════════════════════════════════════════
+  //  WEB AUDIO ALARM (no external file needed)
+  // ════════════════════════════════════════
+  let audioCtx = null;
+  let alarmNodes = [];   // oscillator + gain currently playing
+  let alarmPlaying = false;
 
-  let killActive   = false;
+  function getAudioCtx() {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    return audioCtx;
+  }
+
+  // Plays a repeating two-tone beep (like a real ward alarm)
+  function startAlarm() {
+    if (alarmPlaying) return;
+    alarmPlaying = true;
+    playAlarmCycle();
+  }
+
+  function playAlarmCycle() {
+    if (!alarmPlaying) return;
+    const ctx  = getAudioCtx();
+    const gain = ctx.createGain();
+    gain.connect(ctx.destination);
+    gain.gain.setValueAtTime(0.35, ctx.currentTime);
+
+    // High tone
+    const osc1 = ctx.createOscillator();
+    osc1.type = 'square';
+    osc1.frequency.setValueAtTime(880, ctx.currentTime);
+    osc1.connect(gain);
+    osc1.start(ctx.currentTime);
+    osc1.stop(ctx.currentTime + 0.18);
+
+    // Low tone after gap
+    const osc2 = ctx.createOscillator();
+    osc2.type = 'square';
+    osc2.frequency.setValueAtTime(660, ctx.currentTime + 0.22);
+    osc2.connect(gain);
+    osc2.start(ctx.currentTime + 0.22);
+    osc2.stop(ctx.currentTime + 0.40);
+
+    alarmNodes = [osc1, osc2, gain];
+
+    // Repeat cycle every 600ms
+    setTimeout(() => { if (alarmPlaying) playAlarmCycle(); }, 600);
+  }
+
+  function stopAlarm() {
+    alarmPlaying = false;
+    alarmNodes.forEach(n => { try { n.disconnect(); } catch(e) {} });
+    alarmNodes = [];
+  }
+
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
   let killModalMode = 'activate'; // 'activate' | 'rearm'
   let historyData  = []; // in-memory log for CSV
 
@@ -770,7 +821,7 @@
           const status = isNurse ? 'TRIGGERED' : 'BREACH';
           addLog(`${label} Triggered`, 'alert');
           saveToFirebaseLog(label, status);
-          sendPushNotification(`⚠ ${label}`, isNurse ? 'Nurse call button pressed.' : 'Security breach detected!');
+          sendPushNotification(`⚠ ${label}`, isNurse ? 'Technician call button pressed.' : 'Security breach detected!');
         }
       } else {
         el.innerText = isNurse ? 'IDLE' : 'SECURE ✓';
@@ -793,10 +844,10 @@
       if (anyActive && !killActive) {
         const nurseOnly = d.nurse_call == 1 && !d.system1 && !d.system2 && !d.system3;
         document.body.style.backgroundColor = nurseOnly ? '#1a1500' : '#1a0008';
-        alarm.play().catch(() => {});
+        startAlarm();
       } else {
         document.body.style.backgroundColor = '';
-        alarm.pause(); alarm.currentTime = 0;
+        stopAlarm();
       }
     });
   }
@@ -821,7 +872,7 @@
         killBtn.classList.add('hidden');
         rearmBtn.classList.remove('hidden');
         // mute alarm during override
-        alarm.pause(); alarm.currentTime = 0;
+        stopAlarm();
         document.body.style.backgroundColor = '';
       } else {
         dot.classList.remove('active');
@@ -839,7 +890,7 @@
     setupListener('system1',    's1_badge',    'System 1 Breach');
     setupListener('system2',    's2_badge',    'System 2 Breach');
     setupListener('system3',    's3_badge',    'System 3 Breach');
-    setupListener('nurse_call', 'nurse_badge', 'Nurse Call');
+    setupListener('nurse_call', 'nurse_badge', 'Technician Call');
     setupKillswitchListener();
     loadFirebaseLogs();
   }
