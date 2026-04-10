@@ -8,6 +8,9 @@
 
 
 
+  <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-database-compat.js"></script>
+
   <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Exo+2:wght@300;500;700;900&display=swap" rel="stylesheet" />
 
   <style>
@@ -575,9 +578,7 @@
 
 
 
-<script type="module">
-  import { initializeApp }                        from 'https://www.gstatic.com/firebasejs/9.0.0/firebase-app.js';
-  import { getDatabase, ref, set, push, get, onValue, orderByChild, limitToLast, query } from 'https://www.gstatic.com/firebasejs/9.0.0/firebase-database.js';
+<script>
   // ════════════════════════════════════════
   //  CONFIG — fill these in
   // ════════════════════════════════════════
@@ -620,8 +621,8 @@
     alarm.currentTime = 0;
   }
 
-  const app = initializeApp(firebaseConfig);
-  const db  = getDatabase(app);
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
   let killModalMode = 'activate'; // 'activate' | 'rearm'
   let historyData  = []; // in-memory log for CSV
 
@@ -672,7 +673,7 @@
   // ════════════════════════════════════════
   //  FIREBASE HELPERS
   // ════════════════════════════════════════
-  function updateDB(path, val) { set(ref(db, path), val); }
+  function updateDB(path, val) { db.ref(path).set(val); }
 
   function resetAll() {
     updateDB('system1', 0); updateDB('system2', 0);
@@ -691,7 +692,7 @@
 
   function saveToFirebaseLog(event, status) {
     const ts = new Date().toISOString();
-    push(ref(db, 'logs'), { timestamp: ts, event, status });
+    db.ref('logs').push({ timestamp: ts, event, status });
     historyData.unshift({ timestamp: ts, event, status });
     renderHistory();
   }
@@ -718,8 +719,7 @@
 
   // Load existing logs from Firebase on startup
   function loadFirebaseLogs() {
-    const logsQuery = query(ref(db, 'logs'), orderByChild('timestamp'), limitToLast(100));
-    get(logsQuery).then(snap => {
+    db.ref('logs').orderByChild('timestamp').limitToLast(100).once('value', snap => {
       if (!snap.exists()) return;
       historyData = Object.values(snap.val()).reverse();
       renderHistory();
@@ -775,7 +775,7 @@
   let prevState = {};
 
   function setupListener(path, elementId, label) {
-    onValue(ref(db, path), snap => {
+    db.ref(path).on('value', snap => {
       const val   = snap.val();
       const el    = document.getElementById(elementId);
       const prev  = prevState[path];
@@ -809,10 +809,10 @@
 
   function checkGlobalState() {
     Promise.all([
-      get(ref(db, 'system1')),
-      get(ref(db, 'system2')),
-      get(ref(db, 'system3')),
-      get(ref(db, 'nurse_call'))
+      db.ref('system1').once('value'),
+      db.ref('system2').once('value'),
+      db.ref('system3').once('value'),
+      db.ref('nurse_call').once('value')
     ]).then(([s1, s2, s3, nc]) => {
       const v1 = s1.val(), v2 = s2.val(), v3 = s3.val(), vn = nc.val();
       const anyActive = v1 == 1 || v2 == 1 || v3 == 1 || vn == 1;
@@ -829,7 +829,7 @@
 
   // Killswitch listener
   function setupKillswitchListener() {
-    onValue(ref(db, 'killswitch'), snap => {
+    db.ref('killswitch').on('value', snap => {
       killActive = snap.val() === true;
       const dot   = document.getElementById('kill-dot');
       const label = document.getElementById('kill-state-label');
@@ -923,12 +923,12 @@
     closeKillModal();
 
     if (killModalMode === 'activate') {
-      set(ref(db, 'killswitch'), true);
+      db.ref('killswitch').set(true);
       addLog('KILLSWITCH ACTIVATED by operator', 'kill');
       saveToFirebaseLog('Killswitch', 'OVERRIDE');
       sendPushNotification('☠ Killswitch Activated', 'All hardware overridden by operator.');
     } else {
-      set(ref(db, 'killswitch'), false);
+      db.ref('killswitch').set(false);
       addLog('Systems re-armed by operator', 'ok');
       saveToFirebaseLog('Killswitch', 'RE-ARMED');
       sendPushNotification('✓ Systems Re-Armed', 'Ward monitoring resumed.');
@@ -937,5 +937,3 @@
 </script>
 </body>
 </html>
-
-
