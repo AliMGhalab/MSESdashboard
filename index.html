@@ -5,9 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Hospital Ward Management Subsystem</title>
 
-  <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-database-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-messaging-compat.js"></script>
+
 
   <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Exo+2:wght@300;500;700;900&display=swap" rel="stylesheet" />
 
@@ -553,11 +551,7 @@
   </div><!-- /grid -->
 </div><!-- /dashboard -->
 
-<!-- ═══════════════════ SOUND UNLOCK OVERLAY ═══════════════════ -->
-<div id="sound-unlock" class="modal-backdrop hidden" onclick="unlockAudio(); this.classList.add('hidden');">
-  <div style="background:var(--surface);border:1px solid var(--border);border-top:3px solid var(--accent);padding:32px 36px;border-radius:4px;text-align:center;max-width:320px;">
-    <div style="font-size:2rem;margin-bottom:12px;">🔊</div>
-    <div style="font-weight:700
+<!-- ═══════════════════ KILLSWITCH MODAL ═══════════════════ -->
 <div class="modal-backdrop hidden" id="kill-modal">
   <div class="modal">
     <div class="modal-title" id="modal-title">Activate Killswitch</div>
@@ -578,7 +572,9 @@
 
 
 
-<script>
+<script type="module">
+  import { initializeApp }                        from 'https://www.gstatic.com/firebasejs/9.0.0/firebase-app.js';
+  import { getDatabase, ref, set, push, get, onValue, orderByChild, limitToLast, query } from 'https://www.gstatic.com/firebasejs/9.0.0/firebase-database.js';
   // ════════════════════════════════════════
   //  CONFIG — fill these in
   // ════════════════════════════════════════
@@ -623,8 +619,8 @@
     alarm.currentTime = 0;
   }
 
-  firebase.initializeApp(firebaseConfig);
-  const db = firebase.database();
+  const app = initializeApp(firebaseConfig);
+  const db  = getDatabase(app);
   let killModalMode = 'activate'; // 'activate' | 'rearm'
   let historyData  = []; // in-memory log for CSV
 
@@ -675,7 +671,7 @@
   // ════════════════════════════════════════
   //  FIREBASE HELPERS
   // ════════════════════════════════════════
-  function updateDB(path, val) { db.ref(path).set(val); }
+  function updateDB(path, val) { set(ref(db, path), val); }
 
   function resetAll() {
     updateDB('system1', 0); updateDB('system2', 0);
@@ -694,8 +690,7 @@
 
   function saveToFirebaseLog(event, status) {
     const ts = new Date().toISOString();
-    db.ref('logs').push({ timestamp: ts, event, status });
-    // Also keep in memory for CSV
+    push(ref(db, 'logs'), { timestamp: ts, event, status });
     historyData.unshift({ timestamp: ts, event, status });
     renderHistory();
   }
@@ -722,10 +717,10 @@
 
   // Load existing logs from Firebase on startup
   function loadFirebaseLogs() {
-    db.ref('logs').orderByChild('timestamp').limitToLast(100).once('value', snap => {
-      const val = snap.val();
-      if (!val) return;
-      historyData = Object.values(val).reverse();
+    const logsQuery = query(ref(db, 'logs'), orderByChild('timestamp'), limitToLast(100));
+    get(logsQuery).then(snap => {
+      if (!snap.exists()) return;
+      historyData = Object.values(snap.val()).reverse();
       renderHistory();
     });
   }
@@ -779,7 +774,7 @@
   let prevState = {};
 
   function setupListener(path, elementId, label) {
-    db.ref(path).on('value', snap => {
+    onValue(ref(db, path), snap => {
       const val   = snap.val();
       const el    = document.getElementById(elementId);
       const prev  = prevState[path];
@@ -791,7 +786,6 @@
         el.innerText = isNurse ? '🔔 ACTIVE' : '🚨 BREACH';
         el.className = isNurse ? 'badge badge-call' : 'badge badge-breach';
 
-        // Only log/notify on rising edge
         if (prev !== 1) {
           const status = isNurse ? 'TRIGGERED' : 'BREACH';
           addLog(`${label} Triggered`, 'alert');
@@ -813,11 +807,16 @@
   }
 
   function checkGlobalState() {
-    db.ref().once('value', snap => {
-      const d = snap.val() || {};
-      const anyActive = d.system1 == 1 || d.system2 == 1 || d.system3 == 1 || d.nurse_call == 1;
+    Promise.all([
+      get(ref(db, 'system1')),
+      get(ref(db, 'system2')),
+      get(ref(db, 'system3')),
+      get(ref(db, 'nurse_call'))
+    ]).then(([s1, s2, s3, nc]) => {
+      const v1 = s1.val(), v2 = s2.val(), v3 = s3.val(), vn = nc.val();
+      const anyActive = v1 == 1 || v2 == 1 || v3 == 1 || vn == 1;
       if (anyActive && !killActive) {
-        const nurseOnly = d.nurse_call == 1 && !d.system1 && !d.system2 && !d.system3;
+        const nurseOnly = vn == 1 && v1 != 1 && v2 != 1 && v3 != 1;
         document.body.style.backgroundColor = nurseOnly ? '#1a1500' : '#1a0008';
         startAlarm();
       } else {
@@ -829,7 +828,7 @@
 
   // Killswitch listener
   function setupKillswitchListener() {
-    db.ref('killswitch').on('value', snap => {
+    onValue(ref(db, 'killswitch'), snap => {
       killActive = snap.val() === true;
       const dot   = document.getElementById('kill-dot');
       const label = document.getElementById('kill-state-label');
@@ -923,12 +922,12 @@
     closeKillModal();
 
     if (killModalMode === 'activate') {
-      db.ref('killswitch').set(true);
+      set(ref(db, 'killswitch'), true);
       addLog('KILLSWITCH ACTIVATED by operator', 'kill');
       saveToFirebaseLog('Killswitch', 'OVERRIDE');
       sendPushNotification('☠ Killswitch Activated', 'All hardware overridden by operator.');
     } else {
-      db.ref('killswitch').set(false);
+      set(ref(db, 'killswitch'), false);
       addLog('Systems re-armed by operator', 'ok');
       saveToFirebaseLog('Killswitch', 'RE-ARMED');
       sendPushNotification('✓ Systems Re-Armed', 'Ward monitoring resumed.');
