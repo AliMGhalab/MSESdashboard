@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.gstatic.com https://*.firebaseio.com https://*.googleapis.com; connect-src 'self' https://*.firebaseio.com wss://*.firebaseio.com https://*.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https:; media-src 'self';">
   <title>Hospital Ward Management Subsystem</title>
 
 
@@ -551,6 +552,8 @@
   </div><!-- /grid -->
 </div><!-- /dashboard -->
 
+<audio id="alarmSound" loop><source src="alert.mp3" type="audio/mpeg"></audio>
+
 <!-- ═══════════════════ KILLSWITCH MODAL ═══════════════════ -->
 <div class="modal-backdrop hidden" id="kill-modal">
   <div class="modal">
@@ -595,10 +598,8 @@
   // ════════════════════════════════════════
   //  ALARM — alert.mp3
   // ════════════════════════════════════════
-  const alarm = new Audio('alert.mp3');
-  alarm.loop = true;
+  const alarm = document.getElementById('alarmSound');
 
-  // Silently unlock audio policy on login click — muted so nothing is heard
   function unlockAudio() {
     alarm.volume = 0;
     alarm.play().then(() => {
@@ -936,3 +937,5 @@
 </script>
 </body>
 </html>
+
+
