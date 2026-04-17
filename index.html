@@ -1,57 +1,126 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Hospital Alert System</title>
+<title>Hospital Alert Advanced Dashboard</title>
 
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
-  <style>
-    body { font-family: Arial; background:#0f172a; color:white; text-align:center; }
+<style>
+body {
+  margin:0;
+  font-family: Arial;
+  background: radial-gradient(circle at top, #0f172a, #020617);
+  color:white;
+}
 
-    .hidden { display:none; }
-    .visible { display:block; }
+/* LOGIN */
+#login {
+  height:100vh;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  align-items:center;
+}
 
-    .badge { padding:10px; margin:10px; display:inline-block; border-radius:10px; }
-    .badge-secure { background:green; }
-    .badge-breach { background:red; }
-    .badge-call { background:orange; }
-    .badge-override { background:purple; }
+input {
+  padding:10px;
+  border-radius:8px;
+  border:none;
+}
 
-    #dashboard { margin-top:20px; }
-  </style>
+button {
+  margin-top:10px;
+  padding:10px 20px;
+  border-radius:8px;
+  border:none;
+  cursor:pointer;
+}
+
+/* DASHBOARD */
+#dashboard {
+  display:none;
+  padding:20px;
+}
+
+/* GRID */
+.grid {
+  display:grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap:15px;
+  margin-top:20px;
+}
+
+/* CARD */
+.card {
+  padding:20px;
+  border-radius:16px;
+  background: rgba(255,255,255,0.08);
+  backdrop-filter: blur(10px);
+  text-align:center;
+  transition:0.3s;
+  border:1px solid rgba(255,255,255,0.1);
+}
+
+.card:hover {
+  transform: scale(1.02);
+}
+
+/* STATUS */
+.secure { box-shadow: 0 0 10px green; }
+.breach { box-shadow: 0 0 15px red; }
+.call { box-shadow: 0 0 15px orange; }
+
+/* KILLSWITCH */
+#banner {
+  display:none;
+  background:red;
+  padding:10px;
+  text-align:center;
+  font-weight:bold;
+  animation: blink 1s infinite;
+}
+
+@keyframes blink {
+  50% { opacity:0.5; }
+}
+</style>
 </head>
 
 <body>
 
+<div id="banner">⚠ KILLSWITCH ACTIVE ⚠</div>
+
 <!-- LOGIN -->
-<div id="login-screen">
-  <h2>LOGIN</h2>
-  <input id="pw-input" type="password" placeholder="Password">
-  <button onclick="attemptLogin()">Enter</button>
-  <p id="login-err"></p>
+<div id="login">
+  <h2>Hospital Login</h2>
+  <input id="pw" type="password" placeholder="Password">
+  <button onclick="login()">Enter</button>
+  <p id="err"></p>
 </div>
 
 <!-- DASHBOARD -->
-<div id="dashboard" class="hidden">
+<div id="dashboard">
 
-  <h1>Hospital Alert Dashboard</h1>
+  <h1>Hospital Alert System</h1>
 
-  <div>
-    <div id="s1_badge" class="badge badge-secure">SECURE</div>
-    <div id="s2_badge" class="badge badge-secure">SECURE</div>
-    <div id="s3_badge" class="badge badge-secure">SECURE</div>
-    <div id="nurse_badge" class="badge badge-secure">SECURE</div>
+  <div class="grid">
+
+    <div id="s1" class="card secure">System 1</div>
+    <div id="s2" class="card secure">System 2</div>
+    <div id="s3" class="card secure">System 3</div>
+    <div id="nurse" class="card secure">Nurse Call</div>
+
   </div>
 
-  <button onclick="resetAll()">RESET ALL</button>
+  <br>
+  <button onclick="reset()">RESET ALL</button>
 </div>
 
-<!-- ALARM SOUND -->
-<audio id="alarmSound" src="alert.mp3"></audio>
+<!-- ALARM -->
+<audio id="alarm" src="alert.mp3"></audio>
 
 <script>
-const DASHBOARD_PASSWORD = "ward2024";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCePnTRSWFX-R0n4iIMLHIr0PZjk-WcHco",
@@ -63,85 +132,86 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-const alarm = document.getElementById("alarmSound");
+const alarm = document.getElementById("alarm");
 
-function startAlarm() {
+function playAlarm(){
   alarm.play().catch(()=>{});
 }
 
-function stopAlarm() {
+function stopAlarm(){
   alarm.pause();
   alarm.currentTime = 0;
 }
 
-function attemptLogin() {
-  const pw = document.getElementById("pw-input").value;
+function login(){
+  const pw = document.getElementById("pw").value;
 
-  if (pw === DASHBOARD_PASSWORD) {
-    document.getElementById("login-screen").classList.add("hidden");
-    document.getElementById("dashboard").classList.remove("hidden");
-    startListeners();
+  if(pw === "ward2024"){
+    document.getElementById("login").style.display="none";
+    document.getElementById("dashboard").style.display="block";
+    start();
   } else {
-    document.getElementById("login-err").innerText = "Wrong password";
+    document.getElementById("err").innerText="Wrong password";
   }
 }
 
-function setBadge(id, type) {
+function setCard(id, state){
   const el = document.getElementById(id);
 
-  if (type === "secure") {
-    el.className = "badge badge-secure";
-    el.innerText = "SECURE";
+  el.classList.remove("secure","breach","call");
+
+  if(state==="secure"){
+    el.classList.add("secure");
   }
-  if (type === "breach") {
-    el.className = "badge badge-breach";
-    el.innerText = "BREACH";
+  if(state==="breach"){
+    el.classList.add("breach");
   }
-  if (type === "call") {
-    el.className = "badge badge-call";
-    el.innerText = "CALL";
+  if(state==="call"){
+    el.classList.add("call");
   }
 }
 
-function resetAll() {
-  db.ref("system1").set(0);
-  db.ref("system2").set(0);
-  db.ref("system3").set(0);
-  db.ref("nurse_call").set(0);
-}
+function start(){
 
-function startListeners() {
-
-  db.ref("system1").on("value", s => {
-    s.val() === 1 ? setBadge("s1_badge","breach") : setBadge("s1_badge","secure");
+  db.ref("system1").on("value", s=>{
+    setCard("s1", s.val()===1 ? "breach":"secure");
   });
 
-  db.ref("system2").on("value", s => {
-    s.val() === 1 ? setBadge("s2_badge","breach") : setBadge("s2_badge","secure");
+  db.ref("system2").on("value", s=>{
+    setCard("s2", s.val()===1 ? "breach":"secure");
   });
 
-  db.ref("system3").on("value", s => {
-    s.val() === 1 ? setBadge("s3_badge","breach") : setBadge("s3_badge","secure");
+  db.ref("system3").on("value", s=>{
+    setCard("s3", s.val()===1 ? "breach":"secure");
   });
 
-  db.ref("nurse_call").on("value", s => {
-    if (s.val() === 1) {
-      setBadge("nurse_badge","call");
-      startAlarm();
+  db.ref("nurse_call").on("value", s=>{
+    if(s.val()===1){
+      setCard("nurse","call");
+      playAlarm();
     } else {
-      setBadge("nurse_badge","secure");
+      setCard("nurse","secure");
       stopAlarm();
+    }
+  });
+
+  db.ref("killswitch").on("value", s=>{
+    if(s.val()===1){
+      document.getElementById("banner").style.display="block";
+    } else {
+      document.getElementById("banner").style.display="none";
     }
   });
 }
 
-window.onload = () => {
-  if (sessionStorage.getItem("auth") === "1") {
-    document.getElementById("login-screen").classList.add("hidden");
-    document.getElementById("dashboard").classList.remove("hidden");
-    startListeners();
-  }
-};
+function reset(){
+  db.ref("system1").set(0);
+  db.ref("system2").set(0);
+  db.ref("system3").set(0);
+  db.ref("nurse_call").set(0);
+  db.ref("killswitch").set(0);
+}
+
 </script>
 
 </body>
