@@ -31,6 +31,7 @@ function stopAlarm() {
 /* ───────── LOGIN ───────── */
 function attemptLogin() {
   const pw = document.getElementById("pw-input").value;
+
   if (pw === DASHBOARD_PASSWORD) {
     sessionStorage.setItem("auth", "1");
     showDashboard();
@@ -56,68 +57,74 @@ function updateDB(path, val) {
 }
 
 function resetAll() {
-  updateDB("system1",0);
-  updateDB("system2",0);
-  updateDB("system3",0);
-  updateDB("nurse_call",0);
-  updateDB("killswitch",0);
+  updateDB("system1", 0);
+  updateDB("system2", 0);
+  updateDB("system3", 0);
+  updateDB("nurse_call", 0);
+  updateDB("killswitch", 0);
 }
 
-/* ───────── UI HELPERS ───────── */
-function setBadge(id, state, type) {
+/* ───────── UI UPDATE CORE (FIXED) ───────── */
+function updateSystem(id, val) {
   const el = document.getElementById(id);
 
-  if (type === "secure") {
+  if (val === 1) {
+    el.className = "badge badge-breach";
+    el.innerText = "BREACH !";
+  } else {
     el.className = "badge badge-secure";
     el.innerText = "SECURE ✓";
   }
-  if (type === "breach") {
-    el.className = "badge badge-breach";
-    el.innerText = "BREACH !";
-  }
-  if (type === "call") {
+}
+
+function updateCall(id, val) {
+  const el = document.getElementById(id);
+
+  if (val === 1) {
     el.className = "badge badge-call";
     el.innerText = "CALL !";
-  }
-  if (type === "override") {
-    el.className = "badge badge-override";
-    el.innerText = "OVERRIDE";
+  } else {
+    el.className = "badge badge-secure";
+    el.innerText = "SECURE ✓";
   }
 }
 
-/* ───────── LISTENERS (FIXED CORE) ───────── */
+function updateKillswitch(val) {
+  const banner = document.getElementById("override-banner");
+  const dot = document.getElementById("kill-dot");
+
+  if (val === 1) {
+    banner.classList.add("visible");
+    dot.classList.add("active");
+  } else {
+    banner.classList.remove("visible");
+    dot.classList.remove("active");
+  }
+}
+
+/* ───────── SINGLE REALTIME LISTENER (IMPORTANT FIX) ───────── */
 function startListeners() {
+  db.ref("/").on("value", snap => {
+    const data = snap.val() || {};
 
-  db.ref("system1").on("value", snap => {
-    snap.val() === 1 ? setBadge("s1_badge",1,"breach") : setBadge("s1_badge",0,"secure");
-  });
+    updateSystem("s1_badge", data.system1);
+    updateSystem("s2_badge", data.system2);
+    updateSystem("s3_badge", data.system3);
 
-  db.ref("system2").on("value", snap => {
-    snap.val() === 1 ? setBadge("s2_badge",1,"breach") : setBadge("s2_badge",0,"secure");
-  });
+    updateCall("nurse_badge", data.nurse_call);
 
-  db.ref("system3").on("value", snap => {
-    snap.val() === 1 ? setBadge("s3_badge",1,"breach") : setBadge("s3_badge",0,"secure");
-  });
+    updateKillswitch(data.killswitch);
 
-  db.ref("nurse_call").on("value", snap => {
-    snap.val() === 1
-      ? setBadge("nurse_badge",1,"call")
-      : setBadge("nurse_badge",0,"secure");
-  });
+    // Alarm logic (prevents spam triggering)
+    const active =
+      data.system1 === 1 ||
+      data.system2 === 1 ||
+      data.system3 === 1 ||
+      data.nurse_call === 1 ||
+      data.killswitch === 1;
 
-  db.ref("killswitch").on("value", snap => {
-    const val = snap.val();
-    const banner = document.getElementById("override-banner");
-    const dot = document.getElementById("kill-dot");
-
-    if (val === 1) {
-      banner.classList.add("visible");
-      dot.classList.add("active");
-    } else {
-      banner.classList.remove("visible");
-      dot.classList.remove("active");
-    }
+    if (active) startAlarm();
+    else stopAlarm();
   });
 }
 
@@ -127,4 +134,4 @@ window.onload = () => {
     showDashboard();
   }
 };
-</script>      
+</script>
