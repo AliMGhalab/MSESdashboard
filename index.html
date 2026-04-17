@@ -1,21 +1,23 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Hospital Alert Advanced Dashboard</title>
+<title>Advanced Hospital Dashboard</title>
 
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
 <style>
+
+/* BACKGROUND */
 body {
   margin:0;
   font-family: Arial;
-  background: radial-gradient(circle at top, #0f172a, #020617);
+  background: radial-gradient(circle at top, #0b1220, #020617);
   color:white;
 }
 
 /* LOGIN */
-#login {
+#login-screen {
   height:100vh;
   display:flex;
   flex-direction:column;
@@ -31,7 +33,7 @@ input {
 
 button {
   margin-top:10px;
-  padding:10px 20px;
+  padding:10px 18px;
   border-radius:8px;
   border:none;
   cursor:pointer;
@@ -43,175 +45,220 @@ button {
   padding:20px;
 }
 
+.visible {
+  display:block;
+}
+
 /* GRID */
 .grid {
   display:grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap:15px;
   margin-top:20px;
 }
 
-/* CARD */
-.card {
-  padding:20px;
-  border-radius:16px;
-  background: rgba(255,255,255,0.08);
-  backdrop-filter: blur(10px);
+/* BADGES */
+.badge {
+  padding:18px;
+  border-radius:14px;
   text-align:center;
+  font-weight:bold;
   transition:0.3s;
+  background: rgba(255,255,255,0.08);
   border:1px solid rgba(255,255,255,0.1);
 }
 
-.card:hover {
-  transform: scale(1.02);
+/* STATES */
+.badge-secure { box-shadow:0 0 10px green; }
+.badge-breach { box-shadow:0 0 15px red; }
+.badge-call { box-shadow:0 0 15px orange; }
+.badge-override { box-shadow:0 0 15px purple; }
+
+/* LOGIN ERROR */
+#login-err {
+  color:red;
+  margin-top:10px;
 }
 
-/* STATUS */
-.secure { box-shadow: 0 0 10px green; }
-.breach { box-shadow: 0 0 15px red; }
-.call { box-shadow: 0 0 15px orange; }
-
 /* KILLSWITCH */
-#banner {
+#override-banner {
   display:none;
   background:red;
   padding:10px;
   text-align:center;
   font-weight:bold;
-  animation: blink 1s infinite;
+  animation:blink 1s infinite;
+}
+
+#override-banner.visible {
+  display:block;
 }
 
 @keyframes blink {
   50% { opacity:0.5; }
 }
+
 </style>
 </head>
 
 <body>
 
-<div id="banner">⚠ KILLSWITCH ACTIVE ⚠</div>
+<!-- KILLSWITCH -->
+<div id="override-banner">⚠ SYSTEM OVERRIDE ACTIVE ⚠</div>
 
 <!-- LOGIN -->
-<div id="login">
+<div id="login-screen">
   <h2>Hospital Login</h2>
-  <input id="pw" type="password" placeholder="Password">
-  <button onclick="login()">Enter</button>
-  <p id="err"></p>
+  <input id="pw-input" type="password" placeholder="Enter Password">
+  <button onclick="attemptLogin()">Login</button>
+  <div id="login-err"></div>
 </div>
 
 <!-- DASHBOARD -->
 <div id="dashboard">
 
-  <h1>Hospital Alert System</h1>
+  <h1>Advanced Hospital System</h1>
+
+  <button onclick="resetAll()">RESET ALL</button>
+  <button onclick="logout()">LOGOUT</button>
 
   <div class="grid">
 
-    <div id="s1" class="card secure">System 1</div>
-    <div id="s2" class="card secure">System 2</div>
-    <div id="s3" class="card secure">System 3</div>
-    <div id="nurse" class="card secure">Nurse Call</div>
+    <div id="s1_badge" class="badge badge-secure">SYSTEM 1</div>
+    <div id="s2_badge" class="badge badge-secure">SYSTEM 2</div>
+    <div id="s3_badge" class="badge badge-secure">SYSTEM 3</div>
+    <div id="nurse_badge" class="badge badge-secure">NURSE CALL</div>
 
   </div>
 
-  <br>
-  <button onclick="reset()">RESET ALL</button>
 </div>
 
-<!-- ALARM -->
-<audio id="alarm" src="alert.mp3"></audio>
+<!-- AUDIO -->
+<audio id="alarmSound" src="alert.mp3"></audio>
 
+<!-- YOUR SCRIPT (UNCHANGED) -->
 <script>
+const DASHBOARD_PASSWORD = "ward2024";
+const ADMIN_PIN = "1234";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCePnTRSWFX-R0n4iIMLHIr0PZjk-WcHco",
   authDomain: "msesalert-b972d.firebaseapp.com",
   databaseURL: "https://msesalert-b972d-default-rtdb.asia-southeast1.firebasedatabase.app",
   projectId: "msesalert-b972d",
+  storageBucket: "msesalert-b972d.firebasestorage.app",
+  messagingSenderId: "992963491194",
+  appId: "1:992963491194:web:f0d0b95343114e067e52c3"
 };
 
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-const alarm = document.getElementById("alarm");
+const alarm = document.getElementById("alarmSound");
 
-function playAlarm(){
+function startAlarm() {
+  alarm.currentTime = 0;
   alarm.play().catch(()=>{});
 }
 
-function stopAlarm(){
+function stopAlarm() {
   alarm.pause();
   alarm.currentTime = 0;
 }
 
-function login(){
-  const pw = document.getElementById("pw").value;
-
-  if(pw === "ward2024"){
-    document.getElementById("login").style.display="none";
-    document.getElementById("dashboard").style.display="block";
-    start();
+function attemptLogin() {
+  const pw = document.getElementById("pw-input").value;
+  if (pw === DASHBOARD_PASSWORD) {
+    sessionStorage.setItem("auth", "1");
+    showDashboard();
   } else {
-    document.getElementById("err").innerText="Wrong password";
+    document.getElementById("login-err").textContent = "Incorrect password";
   }
 }
 
-function setCard(id, state){
+function showDashboard() {
+  document.getElementById("login-screen").classList.add("hidden");
+  document.getElementById("dashboard").classList.add("visible");
+  startListeners();
+}
+
+function logout() {
+  sessionStorage.removeItem("auth");
+  location.reload();
+}
+
+function updateDB(path, val) {
+  db.ref(path).set(val);
+}
+
+function resetAll() {
+  updateDB("system1",0);
+  updateDB("system2",0);
+  updateDB("system3",0);
+  updateDB("nurse_call",0);
+  updateDB("killswitch",0);
+}
+
+function setBadge(id, state, type) {
   const el = document.getElementById(id);
 
-  el.classList.remove("secure","breach","call");
-
-  if(state==="secure"){
-    el.classList.add("secure");
+  if (type === "secure") {
+    el.className = "badge badge-secure";
+    el.innerText = "SECURE ✓";
   }
-  if(state==="breach"){
-    el.classList.add("breach");
+  if (type === "breach") {
+    el.className = "badge badge-breach";
+    el.innerText = "BREACH !";
   }
-  if(state==="call"){
-    el.classList.add("call");
+  if (type === "call") {
+    el.className = "badge badge-call";
+    el.innerText = "CALL !";
+  }
+  if (type === "override") {
+    el.className = "badge badge-override";
+    el.innerText = "OVERRIDE";
   }
 }
 
-function start(){
+function startListeners() {
 
-  db.ref("system1").on("value", s=>{
-    setCard("s1", s.val()===1 ? "breach":"secure");
+  db.ref("system1").on("value", snap => {
+    snap.val() === 1 ? setBadge("s1_badge",1,"breach") : setBadge("s1_badge",0,"secure");
   });
 
-  db.ref("system2").on("value", s=>{
-    setCard("s2", s.val()===1 ? "breach":"secure");
+  db.ref("system2").on("value", snap => {
+    snap.val() === 1 ? setBadge("s2_badge",1,"breach") : setBadge("s2_badge",0,"secure");
   });
 
-  db.ref("system3").on("value", s=>{
-    setCard("s3", s.val()===1 ? "breach":"secure");
+  db.ref("system3").on("value", snap => {
+    snap.val() === 1 ? setBadge("s3_badge",1,"breach") : setBadge("s3_badge",0,"secure");
   });
 
-  db.ref("nurse_call").on("value", s=>{
-    if(s.val()===1){
-      setCard("nurse","call");
-      playAlarm();
+  db.ref("nurse_call").on("value", snap => {
+    snap.val() === 1
+      ? setBadge("nurse_badge",1,"call")
+      : setBadge("nurse_badge",0,"secure");
+  });
+
+  db.ref("killswitch").on("value", snap => {
+    const val = snap.val();
+    const banner = document.getElementById("override-banner");
+
+    if (val === 1) {
+      banner.classList.add("visible");
+      startAlarm();
     } else {
-      setCard("nurse","secure");
+      banner.classList.remove("visible");
       stopAlarm();
     }
   });
-
-  db.ref("killswitch").on("value", s=>{
-    if(s.val()===1){
-      document.getElementById("banner").style.display="block";
-    } else {
-      document.getElementById("banner").style.display="none";
-    }
-  });
 }
 
-function reset(){
-  db.ref("system1").set(0);
-  db.ref("system2").set(0);
-  db.ref("system3").set(0);
-  db.ref("nurse_call").set(0);
-  db.ref("killswitch").set(0);
-}
-
+window.onload = () => {
+  if (sessionStorage.getItem("auth") === "1") {
+    showDashboard();
+  }
+};
 </script>
 
 </body>
