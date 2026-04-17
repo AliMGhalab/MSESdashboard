@@ -1,142 +1,3 @@
-<!DOCTYPE html>
-<html>
-<head>
-<title>Advanced Hospital Dashboard</title>
-
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-
-<style>
-
-/* BACKGROUND */
-body {
-  margin:0;
-  font-family: Arial;
-  background: radial-gradient(circle at top, #0b1220, #020617);
-  color:white;
-}
-
-/* LOGIN */
-#login-screen {
-  height:100vh;
-  display:flex;
-  flex-direction:column;
-  justify-content:center;
-  align-items:center;
-}
-
-input {
-  padding:10px;
-  border-radius:8px;
-  border:none;
-}
-
-button {
-  margin-top:10px;
-  padding:10px 18px;
-  border-radius:8px;
-  border:none;
-  cursor:pointer;
-}
-
-/* DASHBOARD */
-#dashboard {
-  display:none;
-  padding:20px;
-}
-
-.visible {
-  display:block;
-}
-
-/* GRID */
-.grid {
-  display:grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap:15px;
-  margin-top:20px;
-}
-
-/* BADGES */
-.badge {
-  padding:18px;
-  border-radius:14px;
-  text-align:center;
-  font-weight:bold;
-  transition:0.3s;
-  background: rgba(255,255,255,0.08);
-  border:1px solid rgba(255,255,255,0.1);
-}
-
-/* STATES */
-.badge-secure { box-shadow:0 0 10px green; }
-.badge-breach { box-shadow:0 0 15px red; }
-.badge-call { box-shadow:0 0 15px orange; }
-.badge-override { box-shadow:0 0 15px purple; }
-
-/* LOGIN ERROR */
-#login-err {
-  color:red;
-  margin-top:10px;
-}
-
-/* KILLSWITCH */
-#override-banner {
-  display:none;
-  background:red;
-  padding:10px;
-  text-align:center;
-  font-weight:bold;
-  animation:blink 1s infinite;
-}
-
-#override-banner.visible {
-  display:block;
-}
-
-@keyframes blink {
-  50% { opacity:0.5; }
-}
-
-</style>
-</head>
-
-<body>
-
-<!-- KILLSWITCH -->
-<div id="override-banner">⚠ SYSTEM OVERRIDE ACTIVE ⚠</div>
-
-<!-- LOGIN -->
-<div id="login-screen">
-  <h2>Hospital Login</h2>
-  <input id="pw-input" type="password" placeholder="Enter Password">
-  <button onclick="attemptLogin()">Login</button>
-  <div id="login-err"></div>
-</div>
-
-<!-- DASHBOARD -->
-<div id="dashboard">
-
-  <h1>Advanced Hospital System</h1>
-
-  <button onclick="resetAll()">RESET ALL</button>
-  <button onclick="logout()">LOGOUT</button>
-
-  <div class="grid">
-
-    <div id="s1_badge" class="badge badge-secure">SYSTEM 1</div>
-    <div id="s2_badge" class="badge badge-secure">SYSTEM 2</div>
-    <div id="s3_badge" class="badge badge-secure">SYSTEM 3</div>
-    <div id="nurse_badge" class="badge badge-secure">NURSE CALL</div>
-
-  </div>
-
-</div>
-
-<!-- AUDIO -->
-<audio id="alarmSound" src="alert.mp3"></audio>
-
-<!-- YOUR SCRIPT (UNCHANGED) -->
 <script>
 const DASHBOARD_PASSWORD = "ward2024";
 const ADMIN_PIN = "1234";
@@ -154,6 +15,7 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
+/* ───────── ALARM ───────── */
 const alarm = document.getElementById("alarmSound");
 
 function startAlarm() {
@@ -166,6 +28,7 @@ function stopAlarm() {
   alarm.currentTime = 0;
 }
 
+/* ───────── LOGIN ───────── */
 function attemptLogin() {
   const pw = document.getElementById("pw-input").value;
   if (pw === DASHBOARD_PASSWORD) {
@@ -187,6 +50,7 @@ function logout() {
   location.reload();
 }
 
+/* ───────── FIREBASE UPDATE ───────── */
 function updateDB(path, val) {
   db.ref(path).set(val);
 }
@@ -199,6 +63,7 @@ function resetAll() {
   updateDB("killswitch",0);
 }
 
+/* ───────── UI HELPERS ───────── */
 function setBadge(id, state, type) {
   const el = document.getElementById(id);
 
@@ -220,6 +85,7 @@ function setBadge(id, state, type) {
   }
 }
 
+/* ───────── LISTENERS (FIXED CORE) ───────── */
 function startListeners() {
 
   db.ref("system1").on("value", snap => {
@@ -243,23 +109,22 @@ function startListeners() {
   db.ref("killswitch").on("value", snap => {
     const val = snap.val();
     const banner = document.getElementById("override-banner");
+    const dot = document.getElementById("kill-dot");
 
     if (val === 1) {
       banner.classList.add("visible");
-      startAlarm();
+      dot.classList.add("active");
     } else {
       banner.classList.remove("visible");
-      stopAlarm();
+      dot.classList.remove("active");
     }
   });
 }
 
+/* ───────── AUTO LOGIN ───────── */
 window.onload = () => {
   if (sessionStorage.getItem("auth") === "1") {
     showDashboard();
   }
 };
-</script>
-
-</body>
-</html>
+</script>      
