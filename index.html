@@ -1,25 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Hospital Alert System</title>
+
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+  <style>
+    body { font-family: Arial; background:#0f172a; color:white; text-align:center; }
+
+    .hidden { display:none; }
+    .visible { display:block; }
+
+    .badge { padding:10px; margin:10px; display:inline-block; border-radius:10px; }
+    .badge-secure { background:green; }
+    .badge-breach { background:red; }
+    .badge-call { background:orange; }
+    .badge-override { background:purple; }
+
+    #dashboard { margin-top:20px; }
+  </style>
+</head>
+
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <h2>LOGIN</h2>
+  <input id="pw-input" type="password" placeholder="Password">
+  <button onclick="attemptLogin()">Enter</button>
+  <p id="login-err"></p>
+</div>
+
+<!-- DASHBOARD -->
+<div id="dashboard" class="hidden">
+
+  <h1>Hospital Alert Dashboard</h1>
+
+  <div>
+    <div id="s1_badge" class="badge badge-secure">SECURE</div>
+    <div id="s2_badge" class="badge badge-secure">SECURE</div>
+    <div id="s3_badge" class="badge badge-secure">SECURE</div>
+    <div id="nurse_badge" class="badge badge-secure">SECURE</div>
+  </div>
+
+  <button onclick="resetAll()">RESET ALL</button>
+</div>
+
+<!-- ALARM SOUND -->
+<audio id="alarmSound" src="alert.mp3"></audio>
+
 <script>
 const DASHBOARD_PASSWORD = "ward2024";
-const ADMIN_PIN = "1234";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCePnTRSWFX-R0n4iIMLHIr0PZjk-WcHco",
   authDomain: "msesalert-b972d.firebaseapp.com",
   databaseURL: "https://msesalert-b972d-default-rtdb.asia-southeast1.firebasedatabase.app",
   projectId: "msesalert-b972d",
-  storageBucket: "msesalert-b972d.firebasestorage.app",
-  messagingSenderId: "992963491194",
-  appId: "1:992963491194:web:f0d0b95343114e067e52c3"
 };
 
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-/* ───────── ALARM ───────── */
 const alarm = document.getElementById("alarmSound");
 
 function startAlarm() {
-  alarm.currentTime = 0;
   alarm.play().catch(()=>{});
 }
 
@@ -28,103 +74,75 @@ function stopAlarm() {
   alarm.currentTime = 0;
 }
 
-/* ───────── LOGIN ───────── */
 function attemptLogin() {
   const pw = document.getElementById("pw-input").value;
+
   if (pw === DASHBOARD_PASSWORD) {
-    sessionStorage.setItem("auth", "1");
-    showDashboard();
+    document.getElementById("login-screen").classList.add("hidden");
+    document.getElementById("dashboard").classList.remove("hidden");
+    startListeners();
   } else {
-    document.getElementById("login-err").textContent = "Incorrect password";
+    document.getElementById("login-err").innerText = "Wrong password";
   }
 }
 
-function showDashboard() {
-  document.getElementById("login-screen").classList.add("hidden");
-  document.getElementById("dashboard").classList.add("visible");
-  startListeners();
-}
-
-function logout() {
-  sessionStorage.removeItem("auth");
-  location.reload();
-}
-
-/* ───────── FIREBASE UPDATE ───────── */
-function updateDB(path, val) {
-  db.ref(path).set(val);
-}
-
-function resetAll() {
-  updateDB("system1",0);
-  updateDB("system2",0);
-  updateDB("system3",0);
-  updateDB("nurse_call",0);
-  updateDB("killswitch",0);
-}
-
-/* ───────── UI HELPERS ───────── */
-function setBadge(id, state, type) {
+function setBadge(id, type) {
   const el = document.getElementById(id);
 
   if (type === "secure") {
     el.className = "badge badge-secure";
-    el.innerText = "SECURE ✓";
+    el.innerText = "SECURE";
   }
   if (type === "breach") {
     el.className = "badge badge-breach";
-    el.innerText = "BREACH !";
+    el.innerText = "BREACH";
   }
   if (type === "call") {
     el.className = "badge badge-call";
-    el.innerText = "CALL !";
-  }
-  if (type === "override") {
-    el.className = "badge badge-override";
-    el.innerText = "OVERRIDE";
+    el.innerText = "CALL";
   }
 }
 
-/* ───────── LISTENERS (FIXED CORE) ───────── */
+function resetAll() {
+  db.ref("system1").set(0);
+  db.ref("system2").set(0);
+  db.ref("system3").set(0);
+  db.ref("nurse_call").set(0);
+}
+
 function startListeners() {
 
-  db.ref("system1").on("value", snap => {
-    snap.val() === 1 ? setBadge("s1_badge",1,"breach") : setBadge("s1_badge",0,"secure");
+  db.ref("system1").on("value", s => {
+    s.val() === 1 ? setBadge("s1_badge","breach") : setBadge("s1_badge","secure");
   });
 
-  db.ref("system2").on("value", snap => {
-    snap.val() === 1 ? setBadge("s2_badge",1,"breach") : setBadge("s2_badge",0,"secure");
+  db.ref("system2").on("value", s => {
+    s.val() === 1 ? setBadge("s2_badge","breach") : setBadge("s2_badge","secure");
   });
 
-  db.ref("system3").on("value", snap => {
-    snap.val() === 1 ? setBadge("s3_badge",1,"breach") : setBadge("s3_badge",0,"secure");
+  db.ref("system3").on("value", s => {
+    s.val() === 1 ? setBadge("s3_badge","breach") : setBadge("s3_badge","secure");
   });
 
-  db.ref("nurse_call").on("value", snap => {
-    snap.val() === 1
-      ? setBadge("nurse_badge",1,"call")
-      : setBadge("nurse_badge",0,"secure");
-  });
-
-  db.ref("killswitch").on("value", snap => {
-    const val = snap.val();
-    const banner = document.getElementById("override-banner");
-    const dot = document.getElementById("kill-dot");
-
-    if (val === 1) {
-      banner.classList.add("visible");
-      dot.classList.add("active");
+  db.ref("nurse_call").on("value", s => {
+    if (s.val() === 1) {
+      setBadge("nurse_badge","call");
+      startAlarm();
     } else {
-      banner.classList.remove("visible");
-      dot.classList.remove("active");
+      setBadge("nurse_badge","secure");
+      stopAlarm();
     }
   });
 }
 
-/* ───────── AUTO LOGIN ───────── */
 window.onload = () => {
   if (sessionStorage.getItem("auth") === "1") {
-    showDashboard();
+    document.getElementById("login-screen").classList.add("hidden");
+    document.getElementById("dashboard").classList.remove("hidden");
+    startListeners();
   }
 };
 </script>
+
+</body>
+</html>
