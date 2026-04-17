@@ -1,211 +1,49 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
 <meta charset="UTF-8">
-<title>AlertHub Dashboard</title>
+<title>MSES Alert System</title>
 
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-database-compat.js"></script>
 
 <style>
-body {
-  margin:0;
-  font-family: Arial;
-  background:#0b0f1a;
-  color:white;
-}
-
-.hidden { display:none; }
-.visible { display:block; }
-
-#login-screen {
-  height:100vh;
-  display:flex;
-  justify-content:center;
-  align-items:center;
-  flex-direction:column;
-}
-
-input {
-  padding:10px;
-  margin:5px;
-}
-
-button {
-  padding:10px 15px;
-  cursor:pointer;
-}
-
-/* Dashboard */
-#dashboard {
-  padding:20px;
-}
-
-.topbar {
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-}
-
-.grid {
-  display:grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap:15px;
-  margin-top:20px;
-}
-
-.card {
-  background:#111827;
-  padding:15px;
-  border-radius:10px;
-}
-
-.badge {
-  padding:5px 10px;
-  border-radius:5px;
-  display:inline-block;
-}
-
-.badge-secure { background:green; }
-.badge-breach { background:red; }
-.badge-call { background:orange; }
-
-/* logs */
-#logs {
-  margin-top:20px;
-  background:#0f172a;
-  padding:10px;
-  height:200px;
-  overflow:auto;
-}
-
-.log-entry { font-size:13px; margin-bottom:5px; }
-.log-time { color:gray; }
-.log-ok { color:lightgreen; }
-.log-alert { color:orange; }
-.log-kill { color:red; }
-
-/* history table */
-table {
-  width:100%;
-  margin-top:20px;
-  border-collapse:collapse;
-}
-
-td, th {
-  border:1px solid #333;
-  padding:8px;
-  font-size:13px;
-}
-
-.tbl-secure { color:lightgreen; }
-.tbl-breach { color:red; }
-.tbl-kill { color:orange; }
-.tbl-call { color:yellow; }
-
-/* killswitch banner */
-#override-banner {
-  display:none;
-  background:red;
-  padding:10px;
-  text-align:center;
-  font-weight:bold;
-}
-
-#override-banner.visible {
-  display:block;
-}
+body { font-family: Arial; background:#0b0f1a; color:white; text-align:center; }
+button { margin:5px; padding:10px; }
+.box { margin:10px; padding:10px; border:1px solid #333; display:inline-block; }
+.secure { color:lime; }
+.breach { color:red; }
+.warn { color:orange; }
 </style>
 </head>
 
 <body>
 
-<!-- LOGIN -->
-<div id="login-screen">
-  <h2>AlertHub Login</h2>
-  <input type="password" id="pw-input" placeholder="Password">
-  <button onclick="attemptLogin()">Login</button>
-  <p id="login-err" style="color:red;"></p>
-</div>
+<h2>🏥 MSES ALERT DASHBOARD</h2>
 
-<!-- DASHBOARD -->
-<div id="dashboard" class="hidden">
+<button onclick="set('system1',1)">Trigger System 1</button>
+<button onclick="set('system2',1)">Trigger System 2</button>
+<button onclick="set('system3',1)">Trigger System 3</button>
+<button onclick="set('nurse_call',1)">Call Technician</button>
+<button onclick="set('killswitch',1)">KILLSWITCH ON</button>
+<button onclick="set('killswitch',0)">KILLSWITCH OFF</button>
+<button onclick="resetAll()">RESET</button>
 
-<div class="topbar">
-  <h2>AlertHub System</h2>
-  <div id="clock"></div>
-  <button onclick="logout()">Logout</button>
-</div>
+<hr>
 
-<div id="override-banner">⚠ KILLSWITCH ACTIVE ⚠</div>
+<div class="box">System 1: <span id="s1">--</span></div>
+<div class="box">System 2: <span id="s2">--</span></div>
+<div class="box">System 3: <span id="s3">--</span></div>
+<div class="box">Technician: <span id="tech">--</span></div>
+<div class="box">Killswitch: <span id="kill">--</span></div>
 
-<!-- SYSTEM CARDS -->
-<div class="grid">
-  <div class="card">
-    System 1<br>
-    <span id="s1_badge" class="badge badge-secure">SECURE</span><br><br>
-    <button onclick="updateDB('system1',1)">Trigger</button>
-  </div>
+<hr>
 
-  <div class="card">
-    System 2<br>
-    <span id="s2_badge" class="badge badge-secure">SECURE</span><br><br>
-    <button onclick="updateDB('system2',1)">Trigger</button>
-  </div>
-
-  <div class="card">
-    System 3<br>
-    <span id="s3_badge" class="badge badge-secure">SECURE</span><br><br>
-    <button onclick="updateDB('system3',1)">Trigger</button>
-  </div>
-
-  <div class="card">
-    Nurse Call<br>
-    <span id="nurse_badge" class="badge badge-secure">IDLE</span><br><br>
-    <button onclick="updateDB('nurse_call',1)">Call</button>
-  </div>
-
-  <div class="card">
-    Killswitch
-    <div id="kill-dot">🟢</div>
-    <div id="kill-state-label">ARMED — SYSTEMS NOMINAL</div>
-    <button onclick="updateDB('killswitch',1)">ACTIVATE</button>
-    <button onclick="updateDB('killswitch',0)">RESET</button>
-  </div>
-</div>
-
-<!-- LOGS -->
-<h3>Live Logs</h3>
+<h3>Logs</h3>
 <div id="logs"></div>
 
-<!-- HISTORY -->
-<h3>History</h3>
-<table>
-  <thead>
-    <tr>
-      <th>Time</th>
-      <th>Event</th>
-      <th>Status</th>
-    </tr>
-  </thead>
-  <tbody id="history-body"></tbody>
-</table>
-
-</div>
-
-<!-- AUDIO -->
-<audio id="alarmSound" src="alarm.mp3" preload="auto"></audio>
-
-<!-- SCRIPT -->
 <script>
-/* ─────────────────────────────
-   CONFIG
-───────────────────────────── */
-const DASHBOARD_PASSWORD = "ward2024";
-
-/* ─────────────────────────────
-   FIREBASE
-───────────────────────────── */
+/* ---------------- FIREBASE ---------------- */
 const firebaseConfig = {
   apiKey: "AIzaSyCePnTRSWFX-R0n4iIMLHIr0PZjk-WcHco",
   authDomain: "msesalert-b972d.firebaseapp.com",
@@ -219,79 +57,77 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-/* ─────────────────────────────
-   CLOCK
-───────────────────────────── */
-setInterval(() => {
-  document.getElementById("clock").textContent =
-    new Date().toLocaleTimeString("en-GB");
-}, 1000);
-
-/* ─────────────────────────────
-   DB
-───────────────────────────── */
-function updateDB(path,val){
+/* ---------------- WRITE ---------------- */
+function set(path,val){
   db.ref(path).set(val);
 }
 
-/* ─────────────────────────────
-   LOGS
-───────────────────────────── */
-function addLog(msg,type="alert"){
-  const logDiv=document.getElementById("logs");
-  const time=new Date().toLocaleTimeString();
-
-  logDiv.innerHTML=
-  `<div class="log-entry">
-  <span class="log-time">[${time}]</span> ${msg}
-  </div>` + logDiv.innerHTML;
+/* ---------------- RESET ---------------- */
+function resetAll(){
+  set('system1',0);
+  set('system2',0);
+  set('system3',0);
+  set('nurse_call',0);
 }
 
-/* ─────────────────────────────
-   LISTENERS
-───────────────────────────── */
-function listen(path, id, label){
+/* ---------------- LOGS ---------------- */
+function addLog(msg,type){
+  const div = document.getElementById("logs");
+  const p = document.createElement("p");
+  p.innerText = msg;
+  p.className = type;
+  div.prepend(p);
+}
 
-  db.ref(path).on("value", snap=>{
-    const val=snap.val();
-    const el=document.getElementById(id);
+/* ---------------- LISTENER ---------------- */
+const prev = {};
 
-    if(val===1){
-      el.innerText="🚨 ACTIVE";
-      el.className="badge badge-breach";
-      addLog(label+" triggered");
-    }else{
-      el.innerText= path==="nurse_call" ? "IDLE" : "SECURE";
-      el.className="badge badge-secure";
+function listen(path,id,label){
+
+  db.ref(path).on('value', snap=>{
+    const val = snap.val();
+    const el = document.getElementById(id);
+
+    const old = prev[path];
+    prev[path] = val;
+
+    if(val === 1){
+      if(path === "nurse_call"){
+        el.innerText = "ACTIVE";
+        el.className = "warn";
+        addLog("Technician requested", "warn");
+      } else {
+        el.innerText = "BREACH";
+        el.className = "breach";
+        addLog(label + " BREACH detected", "breach");
+      }
+    } else {
+      el.innerText = "SECURE";
+      el.className = "secure";
+
+      if(old === 1){
+        addLog(label + " restored", "secure");
+      }
     }
   });
-
 }
 
-function start(){
-  listen("system1","s1_badge","System 1");
-  listen("system2","s2_badge","System 2");
-  listen("system3","s3_badge","System 3");
-  listen("nurse_call","nurse_badge","Nurse Call");
-}
+/* ---------------- START ---------------- */
+listen('system1','s1','System 1');
+listen('system2','s2','System 2');
+listen('system3','s3','System 3');
+listen('nurse_call','tech','Technician');
 
-/* ─────────────────────────────
-   LOGIN
-───────────────────────────── */
-function attemptLogin(){
-  const pw=document.getElementById("pw-input").value;
-  if(pw===DASHBOARD_PASSWORD){
-    document.getElementById("login-screen").classList.add("hidden");
-    document.getElementById("dashboard").classList.remove("hidden");
-    start();
-  }else{
-    document.getElementById("login-err").innerText="Wrong password";
+db.ref('killswitch').on('value', snap=>{
+  const v = snap.val();
+  const el = document.getElementById("kill");
+
+  el.innerText = v === 1 ? "ACTIVE" : "OFF";
+
+  if(v === 1){
+    addLog("KILLSWITCH ACTIVATED", "breach");
   }
-}
-
-function logout(){
-  location.reload();
-}
+});
 </script>
 
 </body>
